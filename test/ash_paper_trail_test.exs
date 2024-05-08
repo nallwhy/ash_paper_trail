@@ -130,6 +130,34 @@ defmodule AshPaperTrailTest do
                |> Enum.sort_by(& &1.version_inserted_at)
     end
 
+    test "a new version is created on bulk_update" do
+      assert %{subject: "subject", body: "body", id: post_id} =
+               post = Posts.Post.create!(@valid_attrs, tenant: "acme")
+
+      Ash.bulk_update!([post], :update, %{subject: "new subject"},
+        strategy: [:stream, :atomic, :atomic_batches],
+        return_errors?: true,
+        tenant: "acme"
+      )
+
+      assert [
+               %{
+                 subject: "subject",
+                 body: "body",
+                 version_action_type: :create,
+                 version_source_id: ^post_id
+               },
+               %{
+                 subject: "new_subject",
+                 body: "body",
+                 version_action_type: :update,
+                 version_source_id: ^post_id
+               }
+             ] =
+               Ash.read!(Posts.Post.Version, tenant: "acme")
+               |> Enum.sort_by(& &1.version_inserted_at)
+    end
+
     test "a new version is created on bulk_destroy" do
       assert %{subject: "subject", body: "body", id: post_id} =
                post = Posts.Post.create!(@valid_attrs, tenant: "acme")
